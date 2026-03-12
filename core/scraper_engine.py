@@ -54,7 +54,6 @@ class ScraperEngine:
             platforms.append("website")
         if p.linkedin:
             platforms.append("linkedin")
-        # B2B / directory scrapers
         if getattr(p, "indiamart", False):
             platforms.append("indiamart")
         if getattr(p, "tradeindia", False):
@@ -74,6 +73,7 @@ class ScraperEngine:
         request_manager: RequestManager,
     ) -> List[Dict[str, Any]]:
         tasks = []
+        platform_names: List[str] = []
         for name in platforms:
             scraper_cls = SCRAPER_REGISTRY.get(name)
             if not scraper_cls:
@@ -82,27 +82,32 @@ class ScraperEngine:
             scraper = scraper_cls(request_manager=request_manager)
             await scraper.initialize()
             tasks.append(scraper.search_and_extract(query))
+            platform_names.append(name)
+
         results: List[Dict[str, Any]] = []
         if tasks:
-            for out in await asyncio.gather(*tasks, return_exceptions=True):
+            gathered = await asyncio.gather(*tasks, return_exceptions=True)
+            for platform_name, out in zip(platform_names, gathered):
                 if isinstance(out, Exception):
-                    logger.error(f"Scraper error for query='{query}': {out}")
+                    logger.error(f"Scraper error for platform='{platform_name}' query='{query}': {out}")
                 else:
+                    logger.info(f"Platform '{platform_name}' yielded {len(out)} records for query '{query}'")
                     results.extend(out)
         return results
 
     async def run_async(self, queries: Iterable[str]) -> ScraperResult:
         platforms = self._active_platforms()
         all_records: List[Dict[str, Any]] = []
+        query_list = list(queries)
+        logger.info(f"Queries executed: {len(query_list)}")
 
         async with RequestManager(proxy_config=self.settings.proxies.__dict__) as rm:
-            for query in tqdm_asyncio(list(queries), desc="Scraping queries"):
+            for query in tqdm_asyncio(query_list, desc="Scraping queries"):
                 try:
                     records = await self._run_for_query(query, platforms, rm)
                     logger.info(f"Query '{query}' yielded {len(records)} raw records")
                     all_records.extend(records)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     logger.exception(f"Failed to scrape for query='{query}': {exc}")
 
         return ScraperResult(records=all_records)
-

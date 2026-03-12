@@ -1,34 +1,41 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 
-def normalize_phone(phone: str | None) -> str | None:
+NON_DIGIT_PHONE = re.compile(r"[^\d+]")
+
+
+def normalize_phone(phone: str | None) -> str:
     if not phone:
-        return None
-    phone = phone.replace(" ", "").replace("-", "")
-    return phone
+        return ""
+    normalized = NON_DIGIT_PHONE.sub("", phone)
+    return normalized
 
 
-def normalize_url(url: str | None) -> str | None:
+def normalize_url(url: str | None) -> str:
     if not url:
-        return None
-    url = url.strip()
-    if not url:
-        return None
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-    return url.lower()
+        return ""
+    value = url.strip()
+    if not value:
+        return ""
+    if not value.startswith(("http://", "https://")):
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    host = parsed.netloc.lower().removeprefix("www.")
+    path = parsed.path.rstrip("/")
+    return f"{parsed.scheme.lower()}://{host}{path}"
 
 
 def normalize_record(rec: Dict[str, Any]) -> Dict[str, Any]:
-    rec = dict(rec)
-    if "website" in rec:
-        rec["website"] = normalize_url(rec.get("website"))
-    if "phone" in rec:
-        rec["phone"] = normalize_phone(rec.get("phone"))
-    # Normalize casing for company name.
-    if "company_name" in rec and isinstance(rec["company_name"], str):
-        rec["company_name"] = rec["company_name"].strip()
-    return rec
-
+    normalized = dict(rec)
+    normalized["company_name"] = str(normalized.get("company_name", "")).strip()
+    normalized["website"] = normalize_url(str(normalized.get("website", "")))
+    normalized["phone"] = normalize_phone(str(normalized.get("phone", "")))
+    normalized["email"] = str(normalized.get("email", "")).strip().lower()
+    normalized["industry"] = str(normalized.get("industry", "")).strip().title()
+    normalized["industry_type"] = str(normalized.get("industry_type", "")).strip().title()
+    normalized["address"] = str(normalized.get("address", "")).strip(" ,")
+    return normalized

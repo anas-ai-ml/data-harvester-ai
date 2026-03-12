@@ -1,53 +1,44 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Dict, List
+from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
 from extractors.phone_extractor import extract_phones
 from scrapers.base_scraper import BaseScraper
 
-
 SEARCH_URL = "https://www.tradeindia.com/search.html?search_text={query}"
 
 
 class TradeIndiaScraper(BaseScraper):
-    async def search_and_extract(self, query: str) -> List[Dict[str, Any]]:
-        url = SEARCH_URL.format(query=query.replace(" ", "+"))
+    async def search_and_extract(self, query: str) -> List[Dict[str, str]]:
+        url = SEARCH_URL.format(query=quote_plus(query))
         html = await self.request_manager.get_text(url)
         soup = BeautifulSoup(html, "lxml")
+        records: List[Dict[str, str]] = []
 
-        records: List[Dict[str, Any]] = []
-        for card in soup.select("div.listing_product"):
-            name_el = card.select_one("a.title")
+        for card in soup.select("div.listing_product, div.prod-list")[:25]:
+            name_el = card.select_one("a.title, h2 a, .company-name a")
             if not name_el:
                 continue
-            name = name_el.get_text(strip=True)
-            profile_url = name_el.get("href") or ""
+            name = name_el.get_text(" ", strip=True)
+            profile_url = self.absolute_url(url, name_el.get("href"))
+            address_el = card.select_one(".listing_address, .seller-address")
+            category_el = card.select_one(".listing_category, .business-type")
+            description_el = card.select_one(".product-description, .listing_desc")
+            phones = extract_phones(card.get_text(" ", strip=True))
+            profile_data = await self.enrich_from_profile(profile_url, "TradeIndia")
 
-            addr_el = card.select_one(".listing_address")
-            address = addr_el.get_text(" ", strip=True) if addr_el else ""
-
-            cat_el = card.select_one(".listing_category")
-            category = cat_el.get_text(" ", strip=True) if cat_el else ""
-
-            phone_el = card.select_one(".contact_detail")
-            phone_text = phone_el.get_text(" ", strip=True) if phone_el else ""
-            phones = extract_phones(phone_text)
-
-            records.append(
-                {
-                    "company_name": name,
-                    "website": "",
-                    "phone": phones[0] if phones else "",
-                    "email": "",
-                    "address": address,
-                    "industry": category,
-                    "description": "",
-                    "additional_info": f"TradeIndia profile: {profile_url}",
-                    "source": "tradeindia",
-                }
+            record = self.build_record(
+                company_name=name,
+                phone=phones[0] if phones else "",
+                address=address_el.get_text(" ", strip=True) if address_el else "",
+                industry=category_el.get_text(" ", strip=True) if category_el else "",
+                description=description_el.get_text(" ", strip=True) if description_el else "",
+                additional_info=f"TradeIndia search query: {query}",
+                source="tradeindia",
             )
+            records.append(self.merge_records(record, profile_data))
 
         return records
-

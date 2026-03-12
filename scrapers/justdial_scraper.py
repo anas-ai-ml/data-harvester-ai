@@ -1,54 +1,42 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Dict, List
+from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
 from extractors.phone_extractor import extract_phones
 from scrapers.base_scraper import BaseScraper
 
-
 SEARCH_URL = "https://www.justdial.com/search?type=company&what={query}"
 
 
 class JustDialScraper(BaseScraper):
-    async def search_and_extract(self, query: str) -> List[Dict[str, Any]]:
-        url = SEARCH_URL.format(query=query.replace(" ", "+"))
+    async def search_and_extract(self, query: str) -> List[Dict[str, str]]:
+        url = SEARCH_URL.format(query=quote_plus(query))
         html = await self.request_manager.get_text(url)
         soup = BeautifulSoup(html, "lxml")
+        records: List[Dict[str, str]] = []
 
-        records: List[Dict[str, Any]] = []
-        # JustDial frequently changes layout; this targets generic listing containers.
-        for card in soup.select("div.cntanr"):
-            name_el = card.select_one("span.jcn a")
+        for card in soup.select("div.cntanr, div.resultbox_info")[:25]:
+            name_el = card.select_one("span.jcn a, .resultbox_title_anchor")
             if not name_el:
                 continue
-            name = name_el.get_text(strip=True)
-            profile_url = name_el.get("href") or ""
+            name = name_el.get_text(" ", strip=True)
+            profile_url = self.absolute_url(url, name_el.get("href"))
+            address_el = card.select_one("span.cont_fl_addr, .resultbox_address")
+            category_el = card.select_one("span.cate, .resultbox_category")
+            phones = extract_phones(card.get_text(" ", strip=True))
+            profile_data = await self.enrich_from_profile(profile_url, "JustDial")
 
-            addr_el = card.select_one("span.cont_fl_addr")
-            address = addr_el.get_text(" ", strip=True) if addr_el else ""
-
-            cat_el = card.select_one("span.cntanr span a")
-            category = cat_el.get_text(" ", strip=True) if cat_el else ""
-
-            phone_el = card.select_one("p.contact-info span")
-            phone_text = phone_el.get_text(" ", strip=True) if phone_el else ""
-            phones = extract_phones(phone_text)
-
-            records.append(
-                {
-                    "company_name": name,
-                    "website": "",
-                    "phone": phones[0] if phones else "",
-                    "email": "",
-                    "address": address,
-                    "industry": category,
-                    "description": "",
-                    "additional_info": f"JustDial profile: {profile_url}",
-                    "source": "justdial",
-                }
+            record = self.build_record(
+                company_name=name,
+                phone=phones[0] if phones else "",
+                address=address_el.get_text(" ", strip=True) if address_el else "",
+                industry=category_el.get_text(" ", strip=True) if category_el else "",
+                additional_info=f"JustDial search query: {query}",
+                source="justdial",
             )
+            records.append(self.merge_records(record, profile_data))
 
         return records
-
