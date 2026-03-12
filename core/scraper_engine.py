@@ -35,6 +35,7 @@ SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
     "goodfirms": GoodFirmsScraper,
 }
 
+
 @dataclass
 class ScraperResult:
     records: List[Dict[str, Any]]
@@ -70,14 +71,15 @@ class ScraperEngine:
             platforms.append("goodfirms")
         return platforms
 
-    async def _run_for_query(
+    async def _run_platforms_for_term(
         self,
-        query: str,
+        term: str,
         platforms: Sequence[str],
         request_manager: RequestManager,
     ) -> List[Dict[str, Any]]:
         tasks = []
         platform_names: List[str] = []
+
         for name in platforms:
             scraper_cls = SCRAPER_REGISTRY.get(name)
             if not scraper_cls:
@@ -85,7 +87,7 @@ class ScraperEngine:
                 continue
             scraper = scraper_cls(request_manager=request_manager)
             await scraper.initialize()
-            tasks.append(scraper.search_and_extract(query))
+            tasks.append(scraper.search_and_extract(term))
             platform_names.append(name)
 
         results: List[Dict[str, Any]] = []
@@ -93,10 +95,74 @@ class ScraperEngine:
             gathered = await asyncio.gather(*tasks, return_exceptions=True)
             for platform_name, out in zip(platform_names, gathered):
                 if isinstance(out, Exception):
-                    logger.error(f"Scraper error for platform='{platform_name}' query='{query}': {out}")
-                else:
-                    logger.info(f"Platform '{platform_name}' yielded {len(out)} records for query '{query}'")
+                    logger.error(f"Scraper error for platform='{platform_name}' query='{term}': {out}")
+                    continue
+                logger.info(f"Platform '{platform_name}' yielded {len(out)} records for query '{term}'")
+                results.extend(out)
+
+        return results
+
+    @staticmethod
+    def _extract_website_targets(records: Sequence[Dict[str, Any]]) -> List[str]:
+        seen = set()
+        websites: List[str] = []
+        for record in records:
+            website = str(record.get("website", "")).strip()
+            if not website.startswith(("http://", "https://")):
+                continue
+            if website in seen:
+                continue
+            seen.add(website)
+            websites.append(website)
+        return websites
+
+    async def _run_for_query(
+        self,
+        query: str,
+        platforms: Sequence[str],
+        request_manager: RequestManager,
+    ) -> List[Dict[str, Any]]:
+        use_discovery = "discovery" in platforms
+        use_website = "website" in platforms
+        remaining = [p for p in platforms if p not in {"discovery", "website"}]
+
+        results: List[Dict[str, Any]] = []
+
+        discovery_records: List[Dict[str, Any]] = []
+        if use_discovery:
+            discovery_records = await self._run_platforms_for_term(
+                query,
+                ["discovery"],
+                request_manager,
+            )
+            results.extend(discovery_records)
+
+        if remaining:
+            remaining_records = await self._run_platforms_for_term(
+                query,
+                remaining,
+                request_manager,
+            )
+            results.extend(remaining_records)
+
+        if use_website:
+            website_targets = self._extract_website_targets(discovery_records)
+            if website_targets:
+                website_batches = [
+                    self._run_platforms_for_term(url, ["website"], request_manager)
+                    for url in website_targets
+                ]
+                website_results = await asyncio.gather(*website_batches, return_exceptions=True)
+                for url, out in zip(website_targets, website_results):
+                    if isinstance(out, Exception):
+                        logger.error(f"Website scraping failed for '{url}': {out}")
+                        continue
                     results.extend(out)
+            else:
+                logger.warning(
+                    f"No discovered website targets for query '{query}', skipping website scraper"
+                )
+
         return results
 
     async def run_async(self, queries: Iterable[str]) -> ScraperResult:

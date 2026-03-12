@@ -9,6 +9,7 @@ import yaml
 
 @dataclass
 class PlatformSettings:
+    discovery: bool = True
     google: bool = True
     maps: bool = True
     linkedin: bool = True
@@ -45,10 +46,12 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
 
 
 def load_settings(project_root: Path) -> Settings:
-    platforms_cfg = _load_yaml(project_root / "config" / "platforms.yaml").get("platforms", {})
+    raw_platforms_cfg = _load_yaml(project_root / "config" / "platforms.yaml")
+    platforms_cfg = raw_platforms_cfg.get("platforms", raw_platforms_cfg)
     proxies_cfg = _load_yaml(project_root / "config" / "proxies.yaml").get("proxies", {})
 
     platforms = PlatformSettings(
+        discovery=bool(platforms_cfg.get("discovery", True)),
         google=bool(platforms_cfg.get("google", True)),
         maps=bool(platforms_cfg.get("maps", True)),
         linkedin=bool(platforms_cfg.get("linkedin", True)),
@@ -68,4 +71,3 @@ def load_settings(project_root: Path) -> Settings:
     )
 
     return Settings(project_root=project_root, platforms=platforms, proxies=proxies)
-
