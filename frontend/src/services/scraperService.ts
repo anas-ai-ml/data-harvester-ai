@@ -1,0 +1,12 @@
+import { api } from "@/services/api";
+import type { ScrapeJob, StartScrapePayload } from "@/types/job";
+
+export async function startScrape(payload: StartScrapePayload) {
+  const { data } = await api.post<ScrapeJob>("/api/start-scrape", payload);
+  return data;
+}
+
+export async function getJobs() {
+  const { data } = await api.get<ScrapeJob[]>("/api/jobs");
+  return data;
+}

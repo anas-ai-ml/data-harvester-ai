@@ -1,6 +1,16 @@
 from pathlib import Path
+import site
+import sys
 
-from dotenv import load_dotenv
+user_site = site.getusersitepackages()
+if user_site and user_site not in sys.path:
+    sys.path.append(user_site)
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 from config.settings import load_settings
 from core.orchestrator import Orchestrator
@@ -22,4 +32,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

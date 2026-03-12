@@ -1,9 +1,7 @@
 requests
 beautifulsoup4
 pandas
-playwright
 aiohttp
-asyncio
 gspread
 oauth2client
 python-dotenv
@@ -12,3 +10,5 @@ tqdm
 pyyaml
 loguru
 lxml
+fastapi
+uvicorn
