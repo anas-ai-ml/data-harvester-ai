@@ -36,31 +36,69 @@ export $(cat .env | xargs)
 python main.py
 ```
 
-#### Option B: Docker Deployment
-Create a `Dockerfile`:
-```dockerfile
-FROM python:3.9
+#### Option B: Docker Deployment (Recommended)
 
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+**Quick Start:**
+```bash
+# For Linux/Mac
+./deploy-docker.sh
 
-COPY . .
-CMD ["python", "main.py"]
+# For Windows
+deploy-docker.bat
 ```
 
-Create `docker-compose.yml`:
-```yaml
-version: '3.8'
-services:
-  data-harvester:
-    build: .
-    env_file:
-      - .env
-    volumes:
-      - ./output:/app/output
-      - ./logs:/app/logs
-```
+**Manual Docker Setup:**
+
+1. **Create Dockerfile:**
+   ```dockerfile
+   FROM python:3.11-slim
+   WORKDIR /app
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   RUN playwright install chromium
+   RUN playwright install-deps chromium
+   COPY . .
+   RUN mkdir -p /app/output /app/logs
+   ENV PYTHONPATH=/app
+   ENV PYTHONUNBUFFERED=1
+   CMD ["python", "main.py"]
+   ```
+
+2. **Create docker-compose.yml:**
+   ```yaml
+   version: '3.8'
+   services:
+     data-harvester:
+       build: .
+       container_name: data-harvester
+       restart: unless-stopped
+       env_file:
+         - .env
+       volumes:
+         - ./output:/app/output
+         - ./logs:/app/logs
+       ports:
+         - "8000:8000"
+   ```
+
+3. **Deploy:**
+   ```bash
+   # Build and start
+   docker-compose up -d
+   
+   # View logs
+   docker-compose logs -f data-harvester
+   
+   # Stop services
+   docker-compose down
+   ```
+
+**Docker Benefits:**
+- ✅ Consistent environment across deployments
+- ✅ Easy scaling with Docker Swarm/Kubernetes
+- ✅ Isolated dependencies
+- ✅ Simple deployment and updates
+- ✅ Built-in health checks and restart policies
 
 #### Option C: Cloud Deployment (AWS/Google Cloud/Azure)
 

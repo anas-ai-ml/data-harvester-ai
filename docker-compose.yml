@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  data-harvester:
+    build: .
+    container_name: data-harvester
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./logs:/app/logs
+      - ./config:/app/config
+    ports:
+      - "8000:8000"
+    networks:
+      - data-harvester-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: data-harvester-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - data-harvester-network
+    command: redis-server --appendonly yes
+
+  # Optional: Add PostgreSQL for data storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: data-harvester-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dataharvester
+      POSTGRES_USER: ${DB_USER:-dataharvester}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - data-harvester-network
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  data-harvester-network:
+    driver: bridge
