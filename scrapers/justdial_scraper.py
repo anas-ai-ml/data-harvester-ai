@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import urllib.parse
 from typing import Dict, List
-from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -13,8 +13,11 @@ SEARCH_URL = "https://www.justdial.com/search?type=company&what={query}"
 
 class JustDialScraper(BaseScraper):
     async def search_and_extract(self, query: str) -> List[Dict[str, str]]:
-        url = SEARCH_URL.format(query=quote_plus(query))
-        html = await self.request_manager.get_text(url)
+        url = SEARCH_URL.format(query=urllib.parse.quote_plus(query))
+        try:
+            html = await self.request_manager.fetch(url)
+        except Exception:
+            return []
         soup = BeautifulSoup(html, "lxml")
         records: List[Dict[str, str]] = []
 
@@ -34,6 +37,8 @@ class JustDialScraper(BaseScraper):
                 phone=phones[0] if phones else "",
                 address=address_el.get_text(" ", strip=True) if address_el else "",
                 industry=category_el.get_text(" ", strip=True) if category_el else "",
+                industry_type=category_el.get_text(" ", strip=True) if category_el else "",
+                description=description_el.get_text(" ", strip=True) if description_el else "",
                 additional_info=f"JustDial search query: {query}",
                 source="justdial",
             )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import urllib.parse
 from typing import Dict, List
-from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
 
@@ -12,8 +12,11 @@ SEARCH_URL = "https://clutch.co/search?search={query}"
 
 class ClutchScraper(BaseScraper):
     async def search_and_extract(self, query: str) -> List[Dict[str, str]]:
-        url = SEARCH_URL.format(query=quote_plus(query))
-        html = await self.request_manager.get_text(url)
+        url = SEARCH_URL.format(query=urllib.parse.quote_plus(query))
+        try:
+            html = await self.request_manager.fetch(url)
+        except Exception:
+            return []
         soup = BeautifulSoup(html, "lxml")
         records: List[Dict[str, str]] = []
 
@@ -30,11 +33,12 @@ class ClutchScraper(BaseScraper):
 
             record = self.build_record(
                 company_name=name,
-                website=website_el.get("href") if website_el else "",
+                website=website_el.get("href", "") if website_el else "",
                 industry=industry_el.get_text(" ", strip=True) if industry_el else "",
+                industry_type=industry_el.get_text(" ", strip=True) if industry_el else "",
                 description=desc_el.get_text(" ", strip=True) if desc_el else "",
-                additional_info=f"Clutch search query: {query}",
                 source="clutch",
+                additional_info=f"Clutch search: {query}",
             )
             records.append(self.merge_records(record, profile_data))
 

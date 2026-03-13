@@ -57,7 +57,7 @@ class BaseScraper(ABC):
             return {}
 
         try:
-            html = await self.request_manager.get_text(profile_url)
+            html = await self.request_manager.fetch(profile_url)
         except Exception:
             return {}
 

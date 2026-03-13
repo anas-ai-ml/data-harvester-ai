@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import urllib.parse
 from typing import Dict, List
-from urllib.parse import quote_plus, urlparse
 
 from bs4 import BeautifulSoup
 
@@ -15,30 +15,45 @@ class DiscoveryScraper(BaseScraper):
 
     async def search_and_extract(self, query: str) -> List[Dict[str, str]]:
 
-        url = SEARCH_URL.format(query=quote_plus(query))
+        url = SEARCH_URL.format(query=urllib.parse.quote_plus(query))
 
-        html = await self.request_manager.get_text(url)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+        html = await self.request_manager.fetch(url, headers=headers)
 
         soup = BeautifulSoup(html, "lxml")
 
         records: List[Dict[str, str]] = []
 
-        for a in soup.select("li.b_algo h2 a"):
-
-            href = a.get("href")
-
-            if not href:
+        for result in soup.select("li.b_algo")[:15]:
+            # Extract human-readable title from the anchor text
+            title_el = result.select_one("h2 a")
+            if not title_el:
                 continue
 
-            domain = urlparse(href).netloc
-
-            if "bing.com" in domain:
+            href = title_el.get("href", "")
+            if not href or "bing.com" in href:
                 continue
+
+            # Use the anchor text as the company name (human-readable)
+            company_name = title_el.get_text(" ", strip=True)
+
+            # Fall back to the domain name if title is useless
+            if not company_name or len(company_name) < 2:
+                domain = urllib.parse.urlparse(href).netloc
+                company_name = domain.replace("www.", "")
+
+            # Extract snippet/description
+            snippet_el = result.select_one("p, .b_caption p")
+            description = snippet_el.get_text(" ", strip=True) if snippet_el else ""
 
             record = self.build_record(
-                company_name=href,
+                company_name=company_name,
                 website=href,
-                description=f"Discovered via search query: {query}",
+                description=description or f"Discovered via search query: {query}",
                 source="discovery",
                 additional_info="Search engine discovery",
             )

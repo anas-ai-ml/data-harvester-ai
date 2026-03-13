@@ -1,12 +1,37 @@
 from __future__ import annotations
 
+import datetime
+import time
+from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Iterable, Mapping, Any, List
+from typing import Any, Iterable, List, Mapping
 
 import gspread
+import requests
+from oauth2client import client as oauth_client
 from oauth2client.service_account import ServiceAccountCredentials
 
 from utils.schema_formatter import OUTPUT_FIELDS
+
+_time_offset = 0.0
+try:
+    r = requests.get("https://www.googleapis.com", timeout=3)
+    google_dt = parsedate_to_datetime(r.headers["Date"])
+    google_time = google_dt.timestamp()
+    local_time = time.time()
+    if abs(google_time - local_time) > 300:
+        _time_offset = google_time - local_time
+        _orig_time = time.time
+
+        def _patched_time():
+            return _orig_time() + _time_offset
+
+        time.time = _patched_time
+
+        # oauth2client uses its own module-level UTC clock when minting JWTs.
+        oauth_client._UTCNOW = lambda: datetime.datetime.utcnow() + datetime.timedelta(seconds=_time_offset)
+except Exception:
+    pass
 
 
 def _get_client(credentials_path: Path) -> gspread.Client:
@@ -25,14 +50,18 @@ def append_to_sheet(
     records: Iterable[Mapping[str, Any]],
 ) -> None:
     if not credentials_path.exists():
-        # Fail silently if credentials are missing; user can add them later.
-        return
+        raise FileNotFoundError(f"Google credentials not found at {credentials_path}")
     try:
         client = _get_client(credentials_path)
-    except Exception:
-        # Invalid or placeholder credentials; skip Sheets integration gracefully.
-        return
-    sh = client.open(sheet_name)
+    except Exception as exc:
+        raise ValueError(f"Invalid Google credentials: {exc}")
+    try:
+        sh = client.open(sheet_name)
+    except gspread.SpreadsheetNotFound:
+        raise ValueError(f"Could not find a Google Sheet named '{sheet_name}'. Please ensure you have created a blank Google Spreadsheet named EXACTLY '{sheet_name}' and shared it with the service account email.")
+    except gspread.exceptions.APIError as e:
+        raise ValueError(f"Google API Error: {e}. Ensure you enabled Google Sheets and Google Drive APIs.")
+        
     try:
         ws = sh.worksheet(worksheet_name)
     except gspread.WorksheetNotFound:

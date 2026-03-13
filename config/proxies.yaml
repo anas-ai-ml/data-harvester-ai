@@ -1,6 +1,66 @@
 proxies:
+  # -------------------------------------------------------
+  # Master switch — set to true to enable proxy rotation
+  # -------------------------------------------------------
   enabled: false
-  http:
-  https:
+
+  # -------------------------------------------------------
+  # mode: which proxy provider to use
+  #   pool        — static list of proxies (see `list` below)
+  #   webshare    — Webshare.io rotating endpoint
+  #   brightdata  — Bright Data (ex-Luminati) super-proxy
+  #   smartproxy  — SmartProxy residential
+  #   custom      — single custom proxy URL
+  # -------------------------------------------------------
+  mode: pool
+
+  # Rotation strategy: round_robin | random
   rotation_strategy: round_robin
 
+  # -------------------------------------------------------
+  # MODE: pool — static proxy list (round-robin rotated)
+  # Add as many proxies as you have. Format:
+  #   http://ip:port
+  #   http://user:pass@ip:port
+  #   socks5://ip:port
+  # -------------------------------------------------------
+  list:
+    # - http://1.2.3.4:8080
+    # - http://user:pass@5.6.7.8:3128
+    # - socks5://9.10.11.12:1080
+
+  # -------------------------------------------------------
+  # MODE: webshare — Webshare.io rotating residential proxy
+  # Sign up: https://www.webshare.io
+  # endpoint: http://p.webshare.io:80
+  # Set PROXY_USERNAME and PROXY_PASSWORD in .env
+  # -------------------------------------------------------
+  # mode: webshare
+  # endpoint: http://p.webshare.io:80
+  # username: your_username   # or set via PROXY_USERNAME env var
+  # password: your_password   # or set via PROXY_PASSWORD env var
+
+  # -------------------------------------------------------
+  # MODE: brightdata — Bright Data super-proxy
+  # Sign up: https://brightdata.com
+  # Rotates IP on each new session automatically.
+  # -------------------------------------------------------
+  # mode: brightdata
+  # endpoint: http://brd.superproxy.io:22225
+  # username: brd-customer-XXXX-zone-residential
+  # password: your_password
+
+  # -------------------------------------------------------
+  # MODE: smartproxy — SmartProxy rotating residential
+  # Sign up: https://smartproxy.com
+  # -------------------------------------------------------
+  # mode: smartproxy
+  # endpoint: http://gate.smartproxy.com:7000
+  # username: your_username
+  # password: your_password
+
+  # -------------------------------------------------------
+  # MODE: custom — single proxy URL
+  # -------------------------------------------------------
+  # mode: custom
+  # url: http://user:pass@your-proxy.example.com:8080

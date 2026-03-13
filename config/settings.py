@@ -19,14 +19,21 @@ class PlatformSettings:
     justdial: bool = True
     clutch: bool = True
     goodfirms: bool = True
+    google_places: bool = False  # Requires GOOGLE_API_KEY env var
 
 
 @dataclass
 class ProxySettings:
     enabled: bool = False
+    mode: str = "pool"  # pool | webshare | brightdata | smartproxy | custom
     http: str | None = None
     https: str | None = None
-    rotation_strategy: str = "round_robin"
+    url: str | None = None        # for mode=custom
+    endpoint: str | None = None   # for mode=webshare/brightdata/smartproxy
+    username: str | None = None
+    password: str | None = None
+    rotation_strategy: str = "round_robin"  # round_robin | random
+    list: list = field(default_factory=list)  # for mode=pool
 
 
 @dataclass
@@ -61,13 +68,20 @@ def load_settings(project_root: Path) -> Settings:
         justdial=bool(platforms_cfg.get("justdial", True)),
         clutch=bool(platforms_cfg.get("clutch", True)),
         goodfirms=bool(platforms_cfg.get("goodfirms", True)),
+        google_places=bool(platforms_cfg.get("google_places", False)),
     )
 
     proxies = ProxySettings(
         enabled=bool(proxies_cfg.get("enabled", False)),
+        mode=proxies_cfg.get("mode", "pool"),
         http=proxies_cfg.get("http"),
         https=proxies_cfg.get("https"),
+        url=proxies_cfg.get("url"),
+        endpoint=proxies_cfg.get("endpoint"),
+        username=proxies_cfg.get("username"),
+        password=proxies_cfg.get("password"),
         rotation_strategy=proxies_cfg.get("rotation_strategy", "round_robin"),
+        list=proxies_cfg.get("list", []),
     )
 
     return Settings(project_root=project_root, platforms=platforms, proxies=proxies)

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "JOB-EBDAAA0A",
+    "query": "real estate real estate kolkata",
+    "keyword": "real estate",
+    "industry": "real estate",
+    "location": "kolkata",
+    "status": "Completed",
+    "recordsFound": 15,
+    "startTime": "2026-03-13T21:37:23.605393+00:00",
+    "progress": 100,
+    "sources": [
+      "google",
+      "linkedin",
+      "website",
+      "maps",
+      "indiamart",
+      "justdial",
+      "tradeindia"
+    ]
+  },
+  {
+    "id": "JOB-A64EA286",
+    "query": "real estate retail estate kolkata",
+    "keyword": "real estate",
+    "industry": "retail estate",
+    "location": "kolkata",
+    "status": "Completed",
+    "recordsFound": 30,
+    "startTime": "2026-03-13T21:37:06.363631+00:00",
+    "progress": 100,
+    "sources": [
+      "google",
+      "linkedin",
+      "website",
+      "maps",
+      "indiamart",
+      "justdial",
+      "tradeindia"
+    ]
+  }
+]

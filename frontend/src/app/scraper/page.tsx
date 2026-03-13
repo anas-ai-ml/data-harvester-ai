@@ -1,7 +1,9 @@
 import { JobStatus } from "@/components/jobStatus";
 import { QueryForm } from "@/components/queryForm";
+import { BulkUpload } from "@/components/bulkUpload";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Globe2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sparkles, Globe2, FileUp, Search } from "lucide-react";
 
 export default function ScraperPage() {
   return (
@@ -26,23 +28,57 @@ export default function ScraperPage() {
       </section>
 
       <div className="grid gap-8 xl:grid-cols-[1.3fr_0.8fr]">
-        <Card className="relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-xl shadow-2xl">
-          <div className="absolute top-0 right-0 p-8 w-64 h-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute bottom-0 left-0 p-8 w-64 h-64 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
-          
-          <div className="relative p-6 sm:p-8">
-            <div className="flex items-center gap-3 mb-8">
-              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
-                <Sparkles className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Extraction Parameters</h3>
-                <p className="text-sm text-white/50">Define your target criteria below</p>
-              </div>
-            </div>
-            <QueryForm />
-          </div>
-        </Card>
+        <div className="space-y-6">
+          <Tabs defaultValue="single" className="w-full">
+            <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-black/40 border border-white/10 p-1 rounded-2xl h-12">
+              <TabsTrigger value="single" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-black transition-all">
+                <Search className="h-4 w-4 mr-2" />
+                Single Search
+              </TabsTrigger>
+              <TabsTrigger value="bulk" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-black transition-all">
+                <FileUp className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="single" className="mt-6">
+              <Card className="relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-xl shadow-2xl">
+                <div className="absolute top-0 right-0 p-8 w-64 h-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+                <div className="absolute bottom-0 left-0 p-8 w-64 h-64 bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+                
+                <div className="relative p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Extraction Parameters</h3>
+                      <p className="text-sm text-white/50">Define your target criteria below</p>
+                    </div>
+                  </div>
+                  <QueryForm />
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="bulk" className="mt-6">
+              <Card className="relative overflow-hidden bg-black/40 border-white/5 backdrop-blur-xl shadow-2xl">
+                <div className="relative p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                      <FileUp className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Bulk Data Import</h3>
+                      <p className="text-sm text-white/50">Upload your JSON or CSV parameter file</p>
+                    </div>
+                  </div>
+                  <BulkUpload />
+                </div>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
         
         <div className="xl:sticky xl:top-24 h-fit">
           <JobStatus />
