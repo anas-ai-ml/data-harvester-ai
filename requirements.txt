@@ -7,7 +7,7 @@ python-dotenv
 selenium
 webdriver-manager
 fake-useragent
-python-telegram-botenv
+python-telegram-bot
 tenacity
 tqdm
 pyyaml
