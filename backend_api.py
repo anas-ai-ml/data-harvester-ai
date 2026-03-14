@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from contextlib import asynccontextmanager
 
 from config.settings import Settings, load_settings
 from core.pipeline import Pipeline
@@ -108,7 +109,21 @@ class JobResponse(BaseModel):
 # FastAPI app
 # ---------------------------------------------------------------------------
 
-app = FastAPI(title="DataHarvester API", version="0.4.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    JOBS.clear()
+    yield
+    # Shutdown (if needed)
+    pass
+
+app = FastAPI(
+    title="Data Harvester API",
+    description="API for data scraping and extraction",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -305,14 +320,6 @@ async def _run_bulk_scrape_job(job_id: str, query_inputs: list[QueryInput], sour
         LOGGER.exception("Bulk scrape job %s failed: %s", job_id, exc)
 
 
-# ---------------------------------------------------------------------------
-# Startup
-# ---------------------------------------------------------------------------
-
-@app.on_event("startup")
-def startup_event() -> None:
-    # Restore persisted jobs and companies
-    JOBS.clear()
     JOBS.extend(_load_jobs())
     COMPANIES.clear()
     COMPANIES.extend(_load_results())
