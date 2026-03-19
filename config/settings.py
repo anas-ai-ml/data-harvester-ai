@@ -21,6 +21,7 @@ class PlatformSettings:
     goodfirms: bool = True
     google_places: bool = False
     searx: bool = True
+    direct_website: bool = True
 
 
 @dataclass
@@ -73,6 +74,7 @@ def load_settings(project_root: Path) -> Settings:
         goodfirms=bool(platforms_cfg.get("goodfirms", True)),
         google_places=bool(platforms_cfg.get("google_places", False)),
         searx=bool(platforms_cfg.get("searx", True)),
+        direct_website=bool(platforms_cfg.get("direct_website", True)),
     )
 
     proxies = ProxySettings(

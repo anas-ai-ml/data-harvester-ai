@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Sequence, Type
 
@@ -22,6 +23,7 @@ from utils.request_manager import RequestManager
 from scrapers.discovery_scraper import DiscoveryScraper
 from scrapers.google_places_scraper import GooglePlacesScraper
 from scrapers.searx_scraper import SearxScraper
+from scrapers.direct_website_scraper import DirectWebsiteScraper
 
 
 SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
@@ -37,6 +39,7 @@ SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
     "goodfirms": GoodFirmsScraper,
     "google_places": GooglePlacesScraper,
     "searx": SearxScraper,
+    "direct_website": DirectWebsiteScraper,
 }
 
 
@@ -77,6 +80,8 @@ class ScraperEngine:
             platforms.append("google_places")
         if getattr(p, "searx", False):
             platforms.append("searx")
+        if getattr(p, "direct_website", False):
+            platforms.append("direct_website")
         return platforms
 
     async def _run_platforms_for_term(
@@ -151,16 +156,19 @@ class ScraperEngine:
     ) -> List[Dict[str, Any]]:
         use_discovery = "discovery" in platforms
         use_website = "website" in platforms
+        use_searx = "searx" in platforms
         remaining = [p for p in platforms if p not in {"discovery", "website"}]
 
         results: List[Dict[str, Any]] = []
-
         discovery_records: List[Dict[str, Any]] = []
+
         if use_discovery:
             discovery_records = await self._run_platforms_for_term(
                 query, ["discovery"], request_manager, step_callback
             )
             results.extend(discovery_records)
+            if not discovery_records:
+                logger.warning(f"Discovery scraper returned 0 results for '{query}'")
 
         if remaining:
             remaining_records = await self._run_platforms_for_term(
@@ -170,27 +178,108 @@ class ScraperEngine:
 
         if use_website:
             website_targets = self._extract_website_targets(results)
+
+            if not website_targets:
+                if use_discovery or use_searx:
+                    logger.warning(
+                        f"No websites found from discovery for '{query}', trying direct website scraping..."
+                    )
+
+                direct_urls = self._try_direct_search(query)
+                if direct_urls:
+                    logger.info(f"Found {len(direct_urls)} direct URLs for '{query}'")
+                    website_targets.extend(direct_urls)
+
             if website_targets:
+                logger.info(f"Scraping {len(website_targets)} websites for '{query}'")
                 website_batches = [
                     self._run_platforms_for_term(
                         url, ["website"], request_manager, step_callback
                     )
-                    for url in website_targets
+                    for url in website_targets[:10]
                 ]
                 website_results = await asyncio.gather(
                     *website_batches, return_exceptions=True
                 )
-                for url, out in zip(website_targets, website_results):
+                for url, out in zip(website_targets[:10], website_results):
                     if isinstance(out, Exception):
                         logger.error(f"Website scraping failed for '{url}': {out}")
                         continue
-                    results.extend(out)
+                    if out:
+                        results.extend(out)
+                        logger.info(
+                            f"Website scraper got {len(out)} records from {url}"
+                        )
+            else:
+                logger.warning(
+                    f"No discovered website targets for query '{query}', trying direct website scraper..."
+                )
+
+                if "direct_website" in SCRAPER_REGISTRY:
+                    direct_results = await self._run_platforms_for_term(
+                        query, ["direct_website"], request_manager, step_callback
+                    )
+                    if direct_results:
+                        logger.info(
+                            f"Direct website scraper got {len(direct_results)} records"
+                        )
+                        results.extend(direct_results)
+                    else:
+                        logger.warning(
+                            f"Direct website scraper also returned 0 results for '{query}'"
+                        )
+
+                direct_urls = self._try_direct_search(query)
+                if direct_urls:
+                    logger.info(f"Found {len(direct_urls)} direct URLs for '{query}'")
+                    website_targets.extend(direct_urls)
+
+            if website_targets:
+                logger.info(f"Scraping {len(website_targets)} websites for '{query}'")
+                website_batches = [
+                    self._run_platforms_for_term(
+                        url, ["website"], request_manager, step_callback
+                    )
+                    for url in website_targets[:10]
+                ]
+                website_results = await asyncio.gather(
+                    *website_batches, return_exceptions=True
+                )
+                for url, out in zip(website_targets[:10], website_results):
+                    if isinstance(out, Exception):
+                        logger.error(f"Website scraping failed for '{url}': {out}")
+                        continue
+                    if out:
+                        results.extend(out)
+                        logger.info(
+                            f"Website scraper got {len(out)} records from {url}"
+                        )
             else:
                 logger.warning(
                     f"No discovered website targets for query '{query}', skipping website scraper"
                 )
 
         return results
+
+    def _try_direct_search(self, query: str) -> List[str]:
+        urls = []
+
+        company_name = re.sub(r"[^\w\s]", " ", query).strip()
+        company_name_clean = company_name.replace(" ", "").lower()
+
+        common_tlds = [".com", ".co.in", ".in", ".org", ".net"]
+
+        for tld in common_tlds:
+            url = f"https://www.{company_name_clean}{tld}"
+            urls.append(url)
+
+        hyphenated = company_name.replace(" ", "-").lower()
+        for tld in [".com", ".co.in"]:
+            url = f"https://{hyphenated}{tld}"
+            if url not in urls:
+                urls.append(url)
+
+        return list(dict.fromkeys(urls))[:5]
 
     async def run_async(
         self, queries: Iterable[str], progress_callback=None
